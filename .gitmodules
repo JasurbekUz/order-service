@@ -1,0 +1,3 @@
+[submodule "book-shop_protos"]
+	path = book-shop_protos
+	url = https://github.com/JasurbekUz/book-shop_protos.git

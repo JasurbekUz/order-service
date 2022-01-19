@@ -12,7 +12,7 @@ type orderRepo struct {
 	db *sqlx.DB
 }
 
-//NewOrderRepo... .
+// NewOrderRepo... .
 func NewOrderRepo(db *sqlx.DB) *orderRepo {
 	return &orderRepo{db: db}
 }
@@ -66,14 +66,13 @@ func (r *orderRepo) List(page, limit int64) ([]*pb.Order, int64, error) {
 		limit,
 		offset,
 	)
-	defer rows.Close()
 	if err != nil {
 		return nil, 0, err
 	}
 	if err = rows.Err(); err != nil {
 		return nil, 0, err
 	}
-
+	defer rows.Close()
 	var (
 		orders []*pb.Order
 		count  int64
@@ -95,9 +94,14 @@ func (r *orderRepo) List(page, limit int64) ([]*pb.Order, int64, error) {
 
 		orders = append(orders, &order)
 	}
+
 	err = r.db.QueryRow(
 		`select count(oreder_id) from orders where deleted_at is null`,
 	).Scan(&count)
+	if err != nil {
+		return nil, 0, err
+	}
+
 	return orders, count, nil
 }
 

@@ -4,7 +4,7 @@ import (
 	pb "github.com/JasurbekUz/order-service/genproto/order_service"
 )
 
-//OrderStorageI... .
+// OrderStorageI...
 type OrderStorageI interface {
 	Create(pb.Order) (pb.Order, error)
 	Get(id string) (pb.Order, error)

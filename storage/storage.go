@@ -1,14 +1,13 @@
 package storage
 
 import (
+	"github.com/JasurbekUz/order-service/storage/postgres"
+	"github.com/JasurbekUz/order-service/storage/repo"
 	"github.com/jmoiron/sqlx"
-
-	"github.com/JasurbekUz/orderService/storage/postgres"
-	"github.com/JasurbekUz/orderService/storage/repo"
 )
 
-// IStorage ...
-type IStorage interface {
+//
+type Istorage interface {
 	Order() repo.OrderStorageI
 }
 
@@ -17,14 +16,12 @@ type storagePg struct {
 	orderRepo repo.OrderStorageI
 }
 
-// NewStoragePg ...
 func NewStoragePg(db *sqlx.DB) *storagePg {
 	return &storagePg{
 		db:        db,
 		orderRepo: postgres.NewOrderRepo(db),
 	}
 }
-
 func (s storagePg) Order() repo.OrderStorageI {
 	return s.orderRepo
 }

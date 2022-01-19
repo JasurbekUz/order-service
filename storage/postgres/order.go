@@ -3,25 +3,24 @@ package postgres
 import (
 	"database/sql"
 
-	"github.com/jmoiron/sqlx"
+	pb "github.com/JasurbekUz/order-service/genproto/order_service"
 
-	pb "github.com/JasurbekUz/orderService/genproto"
+	"github.com/jmoiron/sqlx"
 )
 
 type orderRepo struct {
 	db *sqlx.DB
 }
 
-// NewOrderRepo ...
+//NewOrderRepo... .
 func NewOrderRepo(db *sqlx.DB) *orderRepo {
 	return &orderRepo{db: db}
 }
 
 func (r *orderRepo) Create(order pb.Order) (pb.Order, error) {
 	var id string
-	err := r.db.QueryRow(`
-		INSERT INTO orders(order_id, book_id, quantity, description)
-		VALUES ($1, $2, $3, $4, $5) returning order_id`,
+	err := r.db.QueryRow(
+		`insert into orders(order_id, book_id, quantity, description) values ($1, $2, $3, $4) returning order_id`,
 		order.Id,
 		order.BookId,
 		order.Quantity,
@@ -34,7 +33,7 @@ func (r *orderRepo) Create(order pb.Order) (pb.Order, error) {
 	order, err = r.Get(id)
 
 	if err != nil {
-		return pb.Order{}, nil
+		return pb.Order{}, err
 	}
 
 	return order, nil
@@ -42,15 +41,16 @@ func (r *orderRepo) Create(order pb.Order) (pb.Order, error) {
 
 func (r *orderRepo) Get(id string) (pb.Order, error) {
 	var order pb.Order
-
-	err := r.db.QueryRow(`
-		SELECT order_id, book_id, quantity, description, created_at FROM orders 
-		WHERE order_id=$1 and deleted_at is null`, id).Scan(
+	err := r.db.QueryRow(
+		`select order_id, book_id, quantity, description, created_at, updated_at whereis deleted_at is null`,
+		id,
+	).Scan(
 		&order.Id,
 		&order.BookId,
 		&order.Quantity,
 		&order.Description,
 		&order.CreatedAt,
+		&order.UpdatedAt,
 	)
 	if err != nil {
 		return pb.Order{}, err
@@ -61,18 +61,18 @@ func (r *orderRepo) Get(id string) (pb.Order, error) {
 
 func (r *orderRepo) List(page, limit int64) ([]*pb.Order, int64, error) {
 	offset := (page - 1) * limit
-
-	rows, err := r.db.Queryx(`
-		SELECT order_id, book_id, quantity, description, created_at FROM orders 
-		WHERE deleted_at is null
-		LIMIT $1 OFFSET $2`, limit, offset)
+	rows, err := r.db.Queryx(
+		`select order_id, book_id, quantity, description, created_at, updated_at where deleted_at is null limit $1 offset $2`,
+		limit,
+		offset,
+	)
+	defer rows.Close()
 	if err != nil {
 		return nil, 0, err
 	}
 	if err = rows.Err(); err != nil {
 		return nil, 0, err
 	}
-	defer rows.Close() // nolint:errcheck
 
 	var (
 		orders []*pb.Order
@@ -87,6 +87,7 @@ func (r *orderRepo) List(page, limit int64) ([]*pb.Order, int64, error) {
 			&order.Quantity,
 			&order.Description,
 			&order.CreatedAt,
+			&order.UpdatedAt,
 		)
 		if err != nil {
 			return nil, 0, err
@@ -94,22 +95,19 @@ func (r *orderRepo) List(page, limit int64) ([]*pb.Order, int64, error) {
 
 		orders = append(orders, &order)
 	}
-
-	err = r.db.QueryRow(`SELECT count(*) FROM orders WHERE deleted_at is null`).Scan(&count)
-	if err != nil {
-		return nil, 0, err
-	}
-
+	err = r.db.QueryRow(
+		`select count(oreder_id) from orders where deleted_at is null`,
+	).Scan(&count)
 	return orders, count, nil
 }
 
 func (r *orderRepo) Update(order pb.Order) (pb.Order, error) {
-	result, err := r.db.Exec(`
-		UPDATE orders SET book_id=$1, quantity=$2, description=$3, updated_at=current_timestamp
-		WHERE order_id=$6 and deleted_at is null`,
+	result, err := r.db.Exec(
+		`update orders set book_id=$1, quantity=$2, description=$3, updated_at=current_timestamp where order_id=$4 and deleted_at is null`,
 		order.BookId,
 		order.Quantity,
 		order.Description,
+		order.CreatedAt,
 		order.Id,
 	)
 	if err != nil {
@@ -128,11 +126,14 @@ func (r *orderRepo) Update(order pb.Order) (pb.Order, error) {
 }
 
 func (r *orderRepo) Delete(id string) error {
-	result, err := r.db.Exec(`
-		UPDATE orders SET deleted_at=current_timestamp WHERE order_id=$1`, id)
+	result, err := r.db.Exec(
+		`update orders set deleted_at=current_timestamp where order_id=$1`,
+		id,
+	)
 	if err != nil {
 		return err
 	}
+
 	if i, _ := result.RowsAffected(); i == 0 {
 		return sql.ErrNoRows
 	}
